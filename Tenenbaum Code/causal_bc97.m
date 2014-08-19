@@ -1,0 +1,33 @@
+% This script compares causal support with several other models on data from
+% two experiments by Buehner and Cheng (1997)
+
+% generative:
+
+data = [ 41.10 42.62 36.60 28.62 9.46 57.62 47.06 45.71 33.69 70.85 54.02 ...
+	 57.00 76.54 69.02 88.54];
+se = [ 36.85 27.06 24.91 21.45 20.03 32.35 26.49 22.53 26.67 23.19 23.77 ...
+       22.73 23.86 22.21 20.05]/sqrt(52);
+master_obs = [8 8; 6 6; 4 4; 2 2; 0 0;  8 6; 6 4; 4 2; 2 0; 8 ...
+              4; 6 2; 4 0; 8 2; 6 0; 8 0];
+master_n = [ 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 ...
+             8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8 ];
+predictions_gen = causalgenerative(master_obs,master_n,data);
+
+disp('Hit any key to continue')
+pause
+
+% preventive:
+
+data = [ 8.68   22.86   33.89   47.79   45.12   21.09 ...
+	 42.86   58.56   72.00   45.95   64.61   79.28 ...
+	 71.54   84.75   93.58];  
+
+se = [ 2.7007    2.8954    3.0544    3.8014    5.4372    2.0928    2.8915 ...
+       2.6517    3.9233    2.8968    2.5815    2.7206    2.2861    2.6120 ...
+       1.7047 ];
+
+master_obs = [8 8; 6 6; 4 4; 2 2; 0 0;  6 8; 4 6; 2 4; 0 2; 4 8; 2 6; 0 4; ...
+	     2 8; 0 6; 0 8];
+master_n = [ 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; 8 8; ...
+	     8 8; 8 8; 8 8; 8 8; 8 8 ];
+predictions_prev = causalpreventive(master_obs,master_n,data);
