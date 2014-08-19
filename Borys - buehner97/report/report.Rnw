@@ -1,0 +1,156 @@
+\documentclass{article}
+\usepackage[MeX]{polski}
+\usepackage[latin2]{inputenc}
+
+\title{Dane z eksperymentu Buehnera i Chenga 1997}
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+\maketitle{}
+\tableofcontents{}
+
+\SweaveOpts{echo=false,results=hide}
+<<>>=
+## INICJALIZACJA
+#library(adapt)
+df.h = read.csv('../src/generative.csv')
+df.h = df.h[df.h$Quest == 1,]
+df = data.frame(v = names(df.h)[4:18])
+df$mean = 0; df$sd = 0
+for(col in 4:18){
+  df$mean[col-3] = mean(df.h[,col])
+  df$sd[col-3] = sd(df.h[,col])/sqrt(length(df.h[,col]))
+}
+df = df[c(15,10,6,3,1,14,9,5,2,13,8,4,12,7,11),]
+df$e = c(8,6,4,2,0,8,6,4,2,8,6,4,8,6,8)
+df$c = c(8,6,4,2,0,6,4,2,0,4,2,0,2,0,0)
+## To jest to, w kolejno¶ci warunków jak w artykule
+## Griffithsa i Tenenbauma
+
+## Funkcja licz±ca predykcje modelu Causal Support dla podanych danych
+
+## e to wektor liczb wyst±pieñ efektów/skutków w grupie z przyczyn± i w grupie bez przyczyny, N to wektor liczebno¶ci tych grup
+csupport = function(e, N){
+  m0 = integrate(function(wb){
+    dbinom(e[1], N[1], wb) * dbinom(e[2], N[2], wb)
+  }, 0, 1)$value
+  m1 = adapt(2, c(0,0), c(1,1), 
+    functn = function(p)dbinom(e[1], N[1], p[1]) * dbinom(e[2], N[2], p[1] + p[2] - p[1] * p[2]))$value
+  log(m1) - log(m0) }
+df$cs = 0
+for(r in 1:(dim(df)[1]))df$cs[r] = csupport(t(df[r,c('c','e')]), c(8, 8))
+
+
+## Liczymy predykcje dla modelu DeltaP i modelu Power
+df$dp = (df$e - df$c) / 8
+df$power = df$dp / (1-df$c/8)
+df$power[1] = 0 ## tu jest niezdefiniowany
+barplot(df$dp)
+barplot(df$power)
+
+## Szukamy parametru skali staraj±c siê maksymalizowaæ 
+## korelacjê
+
+
+## Szukamy najlepszych parametrów modelu Causal Support
+res.cs = optim(c(1,1,1), function(p){
+  mean((df$mean - (p[2] + p[3] * (sign(df$cs) * abs(df$cs)^p[1])))^2)
+})
+## i modelu DeltaP
+res.dp = optim(c(1), function(p){
+  -cor(df$mean,sign(df$dp) * abs(df$dp)^p)
+  ## mean((df$mean - (p[2] + p[3] * (sign(df$dp) * abs(df$dp)^p[1])))^2)
+})
+## i modelu Power
+res.power = optim(c(1), function(p){
+  -cor(df$mean,sign(df$power) * abs(df$power)^p)
+  ## mean((df$mean - (p[2] + p[3] * (sign(df$power) * abs(df$power)^p[1])))^2)
+})
+## Przeskalowujemy predykcje obu modeli
+df$csp = res.cs$par[2] + res.cs$par[3]*(sign(df$cs) * abs(df$cs)^res.cs$par[1])
+df$dpp = sign(df$dp) * abs(df$dp)^res.dp$par * 100
+## res.dp$par[2] + res.dp$par[3]*(sign(df$dp) * abs(df$dp)^res.dp$par[1])
+df$powerp = sign(df$power) * abs(df$power)^res.power$par * 100
+## res.power$par[2] + res.power$par[3]*(sign(df$power) * abs(df$power)^res.power$par[1])
+df$x = 1:(dim(df)[1])
+
+@ 
+
+\section{Opis danych}
+
+Z listu od Buehnera:
+
+\begin{verbatim}
+find attached 2 excel files for the data you requested, ffixed
+concerning the generative, inhfinal the preventive data.  The data is
+organized such that the variable names cX_Y refer to the contingency
+of the particular condition, where X is the absolute frequency of cell
+A and Y of cell C, so c2_0 would mean that on this condition the
+contingency matrix (A, B, C, D) was 2, 6, 0, 8, and c6_8 would have
+6,2,8,0 I assume that for your interests you will only look at the
+causal ratings, which are those where the variable QUEST takes the
+value of 1 in FFIXED and 0 in Inhfinal
+\end{verbatim}
+
+Nazwa kolumny oznacza ile razy efekt wyst±pi³ w grupie
+eksperymentalnej i ile razy w grupie kontrolnej na 8 przypadków w
+ka¿dej z tych grup.
+
+\section{Wykres z dopasowanymi modelami dP i power}
+
+<<>>=
+x = rep(df$x, times = 3)
+model = rep(c('Delta P', 'moc', 'wyniki'), each = length(df$x))
+y = c(df$dpp, df$powerp, df$mean)
+pl = xyplot(y ~ x | model, aspect = .4, panel = function(x, y, subscripts, ...){
+  width = .8
+  lrect(x-width/2,0,x+width/2,y, fill = 'black')
+  ## Odchylenia std. dla wyników - du¿e co¶ s±!
+  if(model[subscripts[1]] == 'wyniki'){
+    for(i in 1:15){
+      ## pionowa kreska
+      llines(c(x[i],x[i]),c(y[i], y[i] + df$sd[i]))
+      ## pozioma
+      llines(c(x[i]-width/3,x[i]+width/3), rep(y[i]+df$sd[i]))
+    }
+  }
+}, xlab = '', ylab = 'Ocena zwiazku przyczynowo-skutkowego',
+       scales = list(x = list(labels = c('',paste('  ', df$c, '/8 ', df$e, '/8', sep = '')),
+         tick.number = 15, rot = 45)),
+  strip = strip.custom(factor.levels = c(expression(paste(Delta, 'P')),'Moc','Wyniki')))
+print(pl)
+
+pdf(file = 'buehner1.pdf')
+print(pl)
+dev.off()
+
+## Dopasowanie Causal Support
+x = rep(df$x, times = 2)
+model = rep(c('Wsparcie', 'Wyniki'), each = length(df$x))
+y = c(df$csp, df$mean)
+pl = xyplot(y ~ x | model, aspect = .4, panel = function(x, y, subscripts, ...){
+  width = .8
+  lrect(x-width/2,0,x+width/2,y, fill = 'black')
+  ## Odchylenia std. dla wyników - du¿e co¶ s±!
+  if(model[subscripts[1]] == 'Wyniki'){
+    for(i in 1:15){
+      ## pionowa kreska
+      llines(c(x[i],x[i]),c(y[i], y[i] + df$sd[i]))
+      ## pozioma
+      llines(c(x[i]-width/3,x[i]+width/3), rep(y[i]+df$sd[i]))
+    }
+  }
+}, xlab = '', ylab = 'Ocena zwiazku przyczynowo-skutkowego',
+       scales = list(x = list(labels = c('',paste('  ', df$c, '/8 ', df$e, '/8', sep = '')),
+         tick.number = 15, rot = 45)),
+  strip = strip.custom(factor.levels = c('Wsparcie', 'Wyniki')))
+print(pl)
+pdf(file = 'support.pdf')
+print(pl)
+dev.off()
+## Co¶ mi to nie wygl±da najlepiej
+
+@ 
+
+\listoftables
+\listoffigures
+\end{document}
